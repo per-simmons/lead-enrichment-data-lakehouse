@@ -5,7 +5,9 @@ This is an N8N automation (adapted from a client project working with a Data Lak
 
 ## What It Does
 - Extracts LinkedIn post engagement data (comments, reactions, profile info)
+- Extracts those leads with contact information
 - Transforms and enriches lead data through Clay
+- Drafts a personalized outreach note with Instantly
 - Automates data flow from LinkedIn → Apify → n8n → Clay → Sales Pipeline
 
 ## Workflows Included
