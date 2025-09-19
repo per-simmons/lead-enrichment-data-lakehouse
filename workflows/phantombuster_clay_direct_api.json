@@ -1,0 +1,181 @@
+{
+  "name": "PhantomBuster Direct API to Clay",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.phantombuster.com/api/v2/agents/launch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "YOUR_PHANTOMBUSTER_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify({\n  \"id\": \"YOUR_AGENT_ID\",\n  \"argument\": {\n    \"postUrl\": \"https://www.linkedin.com/posts/databricks_example\",\n    \"numberOfCommentsPerLaunch\": 50,\n    \"numberOfLikersPerLaunch\": 50\n  },\n  \"manualLaunch\": true\n}) }}"
+      },
+      "id": "launch_phantombuster",
+      "name": "Launch PhantomBuster via API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "wait_for_scraping",
+      "name": "Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.phantombuster.com/api/v2/agents/fetch-output?id={{$node[\"Launch PhantomBuster via API\"].json.containerId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "YOUR_PHANTOMBUSTER_API_KEY"
+            }
+          ]
+        }
+      },
+      "id": "get_results",
+      "name": "Get PhantomBuster Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse PhantomBuster CSV output to JSON\nconst response = $input.first().json;\n\nif (!response || !response.output) {\n  return [{\n    json: {\n      error: \"No output from PhantomBuster\"\n    }\n  }];\n}\n\n// PhantomBuster returns CSV, we need to parse it\nconst csvData = response.output;\nconst lines = csvData.split('\\n');\nconst headers = lines[0].split(',').map(h => h.trim().replace(/\"/g, ''));\nconst results = [];\n\nfor (let i = 1; i < lines.length; i++) {\n  if (lines[i].trim()) {\n    const values = lines[i].split(',').map(v => v.trim().replace(/\"/g, ''));\n    const obj = {};\n    headers.forEach((header, index) => {\n      obj[header] = values[index] || '';\n    });\n    \n    // Transform to Clay format\n    const nameParts = (obj.name || '').split(' ');\n    results.push({\n      firstName: nameParts[0] || '',\n      lastName: nameParts.slice(1).join(' ') || '',\n      fullName: obj.name || '',\n      title: obj.headline || obj.title || '',\n      companyName: obj.company || '',\n      linkedinUrl: obj.profileUrl || obj.publicIdentifier || '',\n      engagementType: obj.comment ? 'comment' : 'like',\n      commentText: obj.comment || '',\n      timestamp: new Date().toISOString()\n    });\n  }\n}\n\nreturn results.map(item => ({ json: item }));"
+      },
+      "id": "transform_csv",
+      "name": "Parse CSV to JSON",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-8a99cd54-a8ed-48bb-b659-dbae0b6ced0a",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "id": "send_to_clay",
+      "name": "Send Each Lead to Clay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "## 🔧 Setup Instructions\n\n### 1. PhantomBuster Settings:\n- Go to your agent in PhantomBuster\n- DISABLE \"Repeated launch\"\n- Clear any schedules\n- Leave agent idle (not running)\n\n### 2. Get Your IDs:\n- **API Key**: Settings → API\n- **Agent ID**: From agent URL or settings\n\n### 3. Replace in Workflow:\n- `YOUR_PHANTOMBUSTER_API_KEY`\n- `YOUR_AGENT_ID`\n- Update LinkedIn post URL\n\n### 4. Test:\n- Click Execute Workflow\n- PhantomBuster will ONLY run when n8n triggers it\n- No automatic launches!",
+        "height": 400,
+        "width": 350,
+        "color": 6
+      },
+      "id": "setup_note",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch PhantomBuster via API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch PhantomBuster via API": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get PhantomBuster Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PhantomBuster Results": {
+      "main": [
+        [
+          {
+            "node": "Parse CSV to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse CSV to JSON": {
+      "main": [
+        [
+          {
+            "node": "Send Each Lead to Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

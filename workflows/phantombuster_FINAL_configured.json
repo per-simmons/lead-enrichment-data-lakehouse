@@ -1,0 +1,182 @@
+{
+  "name": "PhantomBuster to Clay - FULLY CONFIGURED",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.phantombuster.com/api/v2/agents/launch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "IvDfa9nDQHSo3ROWSy3HvxMnm1EWHZi24P4MzfCzWa4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\"id\": \"6220509975000369\"}"
+      },
+      "id": "launch_phantom",
+      "name": "Launch PhantomBuster",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "notes": "Using stored config - no arguments sent"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "wait",
+      "name": "Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.phantombuster.com/api/v2/agents/fetch-output?id={{$node[\"Launch PhantomBuster\"].json.containerId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "IvDfa9nDQHSo3ROWSy3HvxMnm1EWHZi24P4MzfCzWa4"
+            }
+          ]
+        }
+      },
+      "id": "get_results",
+      "name": "Get PhantomBuster Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse PhantomBuster output for Clay\nconst response = $input.first().json;\n\nif (!response || !response.output) {\n  return [{\n    json: {\n      error: \"No output from PhantomBuster\"\n    }\n  }];\n}\n\n// PhantomBuster returns CSV in the output field\nconst csvData = response.output;\nconst lines = csvData.split('\\n');\nconst headers = lines[0].split(',').map(h => h.trim().replace(/\"/g, ''));\nconst results = [];\n\nfor (let i = 1; i < lines.length; i++) {\n  if (lines[i].trim()) {\n    // Handle CSV with potential commas in fields\n    const regex = /(?:\"([^\"]*(?:\"\"[^\"]*)*)\"|([^,]+))/g;\n    const values = [];\n    let match;\n    while (match = regex.exec(lines[i])) {\n      values.push((match[1] || match[2] || '').replace(/\"\"/g, '\"').trim());\n    }\n    \n    const obj = {};\n    headers.forEach((header, index) => {\n      obj[header] = values[index] || '';\n    });\n    \n    // Transform to Clay format\n    const nameParts = (obj.name || obj.fullName || '').split(' ');\n    results.push({\n      firstName: nameParts[0] || obj.firstName || '',\n      lastName: nameParts.slice(1).join(' ') || obj.lastName || '',\n      fullName: obj.name || obj.fullName || '',\n      title: obj.headline || obj.title || obj.occupation || '',\n      companyName: obj.company || obj.companyName || '',\n      linkedinUrl: obj.profileUrl || obj.publicIdentifier || obj.profileLink || '',\n      engagementType: obj.comment || obj.commentText ? 'comment' : 'like',\n      commentText: obj.comment || obj.commentText || '',\n      timestamp: new Date().toISOString()\n    });\n  }\n}\n\nreturn results.map(item => ({ json: item }));"
+      },
+      "id": "transform_data",
+      "name": "Transform for Clay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-8a99cd54-a8ed-48bb-b659-dbae0b6ced0a",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "id": "send_to_clay",
+      "name": "Send to Clay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "## ✅ FULLY CONFIGURED - READY TO RUN!\n\n### Your Configuration:\n- **API Key**: IvDfa9nDQHSo3ROWSy3HvxMnm1EWHZi24P4MzfCzWa4\n- **Agent ID**: 6220509975000369\n- **Clay Webhook**: Configured\n\n### Before Running:\n1. Make sure your phantom in PhantomBuster has:\n   - LinkedIn session cookie set\n   - LinkedIn post URL configured\n   - Toggle is ON\n   - NO schedule/recurring enabled\n\n### To Run:\n1. Click \"Execute Workflow\"\n2. PhantomBuster will launch\n3. Wait 3 minutes for scraping\n4. Results sent to Clay automatically\n\n### Important:\n- We're NOT sending arguments\n- PhantomBuster uses stored config\n- Update cookie in PhantomBuster every 30 days",
+        "height": 450,
+        "width": 400,
+        "color": 2
+      },
+      "id": "config_note",
+      "name": "Configuration Complete",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch PhantomBuster",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch PhantomBuster": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get PhantomBuster Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PhantomBuster Results": {
+      "main": [
+        [
+          {
+            "node": "Transform for Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for Clay": {
+      "main": [
+        [
+          {
+            "node": "Send to Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

@@ -1,0 +1,127 @@
+{
+  "name": "PhantomBuster WORKING Solution - Don't Send Empty Arguments",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.phantombuster.com/api/v2/agents/launch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "IvDfa9nDQHSo3ROWSy3HvxMnm1EWHZi24P4MzfCzWa4"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify({\"id\": \"YOUR_AGENT_ID\"}) }}"
+      },
+      "id": "launch_without_arguments",
+      "name": "Launch WITHOUT Arguments",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "notes": "DO NOT send empty arguments - let PhantomBuster use stored config"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "wait",
+      "name": "Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.phantombuster.com/api/v2/agents/fetch-output?id={{$node[\"Launch WITHOUT Arguments\"].json.containerId}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "IvDfa9nDQHSo3ROWSy3HvxMnm1EWHZi24P4MzfCzWa4"
+            }
+          ]
+        }
+      },
+      "id": "get_results",
+      "name": "Get Results",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "content": "## THE ACTUAL SOLUTION!\n\n### The Problem:\nn8n's PhantomBuster node sends EMPTY fields which OVERRIDE your stored cookie in PhantomBuster.\n\n### The Fix:\nUse HTTP Request node and ONLY send:\n```json\n{\n  \"id\": \"YOUR_AGENT_ID\"\n}\n```\n\n**DO NOT SEND:**\n- Empty \"argument\" field\n- Empty \"sessionCookie\" field\n- Any other empty parameters\n\n### Setup:\n1. Configure cookie in PhantomBuster UI (once)\n2. Get your Agent ID\n3. Use this workflow\n4. PhantomBuster will use its stored config!\n\n### Why this works:\nBy not sending any argument fields, PhantomBuster uses the configuration you already set up in their UI, including the session cookie.",
+        "height": 450,
+        "width": 400,
+        "color": 3
+      },
+      "id": "solution_explanation",
+      "name": "THE REAL FIX",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch WITHOUT Arguments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch WITHOUT Arguments": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

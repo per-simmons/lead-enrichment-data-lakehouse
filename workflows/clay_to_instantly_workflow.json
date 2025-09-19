@@ -1,0 +1,203 @@
+{
+  "name": "Clay to Instantly - Lead Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "clay-enriched-lead",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook_from_clay",
+      "name": "Webhook from Clay",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [250, 300],
+      "webhookId": "clay-enriched-lead"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract and transform Clay data for Instantly\nconst clayData = $input.first().json;\n\n// Map Clay fields to Instantly format\nconst instantlyLead = {\n  email: clayData.email || clayData.Email,\n  first_name: clayData.firstName || clayData['First Name'] || clayData.first_name,\n  last_name: clayData.lastName || clayData['Last Name'] || clayData.last_name,\n  company_name: clayData.companyName || clayData['Company Name'] || clayData.company,\n  personalization_line1: clayData.personalizationLine1 || clayData.commentText || '',\n  personalization_line2: clayData.personalizationLine2 || clayData.engagementType || '',\n  // Add custom variables for Instantly\n  custom_linkedin_url: clayData.linkedinUrl || clayData['LinkedIn URL'],\n  custom_title: clayData.title || clayData.Title,\n  custom_lead_score: clayData.leadScore || clayData['Lead Score'] || '',\n  custom_engagement_type: clayData.engagementType || '',\n  // Tags for segmentation\n  tags: [\n    clayData.source || 'linkedin',\n    clayData.engagementType || 'comment',\n    `score_${clayData.leadScore || 'unknown'}`\n  ].filter(Boolean).join(',')\n};\n\n// Only proceed if we have an email\nif (!instantlyLead.email) {\n  throw new Error('No email found in Clay data');\n}\n\nreturn [{ json: instantlyLead }];"
+      },
+      "id": "transform_for_instantly",
+      "name": "Transform for Instantly",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [450, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.instantly.ai/api/v2/leads",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_INSTANTLY_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json) }}"
+      },
+      "id": "add_to_instantly",
+      "name": "Add Lead to Instantly",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [650, 300],
+      "notes": "Creates lead in Instantly workspace"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.instantly.ai/api/v2/campaigns/{{$node[\"Get Campaign ID\"].json.campaign_id}}/leads/add",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_INSTANTLY_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ leads: [{ email: $json.email }] }) }}"
+      },
+      "id": "add_to_campaign",
+      "name": "Add to Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 300],
+      "notes": "Adds lead to specific campaign"
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "campaign_id",
+              "value": "YOUR_INSTANTLY_CAMPAIGN_ID"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "get_campaign_id",
+      "name": "Get Campaign ID",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.2,
+      "position": [850, 300],
+      "notes": "Replace with your Instantly campaign ID"
+    },
+    {
+      "parameters": {
+        "mode": "responseNode",
+        "responseCode": 200,
+        "responseData": "={{ JSON.stringify({ status: 'success', message: 'Lead added to Instantly', email: $json.email }) }}",
+        "options": {
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "respond_to_clay",
+      "name": "Respond to Clay",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "## Setup Instructions\n\n### 1. Clay Configuration:\n- Add HTTP API column to your table\n- Set URL to this webhook endpoint\n- Configure Conditional Run:\n  - Only run when enrichment is complete\n  - Check for required fields (email, name, etc.)\n\n### 2. n8n Configuration:\n- Copy webhook URL from 'Webhook from Clay' node\n- Add to Clay HTTP API column\n\n### 3. Instantly Configuration:\n- Replace YOUR_INSTANTLY_API_KEY\n- Replace YOUR_INSTANTLY_CAMPAIGN_ID\n- Get these from Instantly dashboard\n\n### Data Flow:\n1. Clay enriches lead\n2. Clay HTTP API triggers when ready\n3. n8n receives and transforms data\n4. Lead created in Instantly\n5. Lead added to campaign\n6. Success response to Clay",
+        "height": 450,
+        "width": 400,
+        "color": 5
+      },
+      "id": "setup_instructions",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Webhook from Clay": {
+      "main": [
+        [
+          {
+            "node": "Transform for Instantly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for Instantly": {
+      "main": [
+        [
+          {
+            "node": "Add Lead to Instantly",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Lead to Instantly": {
+      "main": [
+        [
+          {
+            "node": "Get Campaign ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Campaign ID": {
+      "main": [
+        [
+          {
+            "node": "Add to Campaign",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add to Campaign": {
+      "main": [
+        [
+          {
+            "node": "Respond to Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

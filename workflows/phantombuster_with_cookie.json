@@ -1,0 +1,117 @@
+{
+  "name": "PhantomBuster with Cookie Passed from n8n",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "launch",
+        "agentId": "YOUR_AGENT_ID",
+        "arguments": "={{JSON.stringify({\"postUrl\": \"https://www.linkedin.com/posts/databricks_datalakehouse-activity-7250515834736640000\", \"numberOfCommentsPerLaunch\": 50, \"numberOfLikersPerLaunch\": 50, \"sessionCookie\": \"YOUR_LINKEDIN_LI_AT_COOKIE\"})}}"
+      },
+      "id": "launch_with_cookie",
+      "name": "Launch with Cookie",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      },
+      "notes": "Cookie is passed in arguments - no need to set in PhantomBuster UI"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "wait",
+      "name": "Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "getOutput",
+        "agentId": "YOUR_AGENT_ID"
+      },
+      "id": "get_results",
+      "name": "Get Results",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## SOLUTION: Pass Cookie from n8n!\n\n### The Missing Piece:\nYou need to pass the sessionCookie IN THE ARGUMENTS when launching from n8n.\n\n### Setup:\n1. Get your LinkedIn li_at cookie\n2. Store it in n8n (credentials or env variable)\n3. Pass it in the arguments JSON:\n\n```json\n{\n  \"postUrl\": \"[LinkedIn post URL]\",\n  \"numberOfCommentsPerLaunch\": 50,\n  \"numberOfLikersPerLaunch\": 50,\n  \"sessionCookie\": \"[YOUR_LI_AT_COOKIE]\"\n}\n```\n\n### This means:\n- No need to set cookie in PhantomBuster UI\n- n8n controls everything\n- Cookie can be rotated in n8n only\n\n### For Production:\nStore cookie in n8n credentials:\n1. Create custom credential type\n2. Store LinkedIn cookie there\n3. Reference in workflow",
+        "height": 450,
+        "width": 400,
+        "color": 2
+      },
+      "id": "solution",
+      "name": "Pass Cookie from n8n",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch with Cookie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch with Cookie": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

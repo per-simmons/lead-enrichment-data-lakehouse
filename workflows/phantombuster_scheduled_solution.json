@@ -1,0 +1,163 @@
+{
+  "name": "PhantomBuster Scheduled + n8n Processing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "id": "schedule_trigger",
+      "name": "Every 3 Hours",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "getOutput",
+        "agentId": "YOUR_AGENT_ID"
+      },
+      "id": "get_phantom_results",
+      "name": "Get Latest PhantomBuster Results",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      },
+      "notes": "PhantomBuster runs on its own schedule, we just fetch results"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get the last processed timestamp from static data\nconst lastProcessed = $getWorkflowStaticData('global').lastProcessedTimestamp || 0;\nconst currentTime = Date.now();\n\n// Filter for new results only\nconst data = $input.first().json;\nif (!data || !data.data) {\n  return [];\n}\n\n// Filter results created after last processed time\nconst newResults = data.data.filter(item => {\n  const itemTime = new Date(item.timestamp || item.createdAt).getTime();\n  return itemTime > lastProcessed;\n});\n\n// Update last processed timestamp\n$getWorkflowStaticData('global').lastProcessedTimestamp = currentTime;\n\n// Transform for Clay\nconst leads = newResults.map(person => {\n  const nameParts = (person.name || '').split(' ');\n  return {\n    firstName: nameParts[0] || '',\n    lastName: nameParts.slice(1).join(' ') || '',\n    fullName: person.name || '',\n    title: person.headline || person.title || '',\n    companyName: person.company || '',\n    linkedinUrl: person.profileUrl || '',\n    engagementType: person.comment ? 'comment' : 'like',\n    commentText: person.comment || '',\n    timestamp: new Date().toISOString(),\n    isNew: true\n  };\n});\n\nreturn leads.map(lead => ({ json: lead }));"
+      },
+      "id": "filter_new",
+      "name": "Filter New Results Only",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.length}}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "check_new_data",
+      "name": "Has New Data?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-8a99cd54-a8ed-48bb-b659-dbae0b6ced0a",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "id": "send_to_clay",
+      "name": "Send New Leads to Clay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1050, 200]
+    },
+    {
+      "parameters": {
+        "content": "## Alternative Approach: Let PhantomBuster Run on Schedule\n\n### How this works:\n1. **PhantomBuster**: Set it to run every 3 hours automatically\n2. **n8n**: Fetches results every 3 hours\n3. **Filter**: Only processes NEW results (not duplicates)\n4. **Clay**: Only gets new leads\n\n### PhantomBuster Setup:\n1. Set cookie in PhantomBuster UI (once)\n2. Enable schedule (every 3 hours)\n3. Let it run automatically\n\n### Benefits:\n- No need to trigger from n8n\n- No cookie in n8n code\n- PhantomBuster handles execution\n- n8n just processes results\n- Update cookie in PhantomBuster UI when needed\n\n### Cookie Management:\n- Set calendar reminder every 30 days\n- Update in PhantomBuster UI only\n- Use PhantomBuster Chrome extension for easier updates",
+        "height": 450,
+        "width": 400,
+        "color": 4
+      },
+      "id": "alternative_approach",
+      "name": "Alternative Approach",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Every 3 Hours": {
+      "main": [
+        [
+          {
+            "node": "Get Latest PhantomBuster Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Latest PhantomBuster Results": {
+      "main": [
+        [
+          {
+            "node": "Filter New Results Only",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter New Results Only": {
+      "main": [
+        [
+          {
+            "node": "Has New Data?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has New Data?": {
+      "main": [
+        [
+          {
+            "node": "Send New Leads to Clay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": {
+    "global": {
+      "lastProcessedTimestamp": 0
+    }
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

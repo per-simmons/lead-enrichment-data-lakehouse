@@ -1,0 +1,80 @@
+{
+  "name": "PhantomBuster - Pass Cookie Every Time",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.phantombuster.com/api/v2/agents/launch",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Phantombuster-Key",
+              "value": "IvDfa9nDQHSo3ROWSy3HvxMnm1EWHZi24P4MzfCzWa4"
+            }
+          ]
+        },
+        "sendBody": true,
+        "bodyParametersUi": {
+          "parameter": [
+            {
+              "name": "id",
+              "value": "6220509975000369"
+            },
+            {
+              "name": "argument",
+              "value": "={\"postUrl\": \"https://www.linkedin.com/posts/databricks_datalakehouse-activity-7250515834736640000\", \"numberOfCommentsPerLaunch\": 50, \"numberOfLikersPerLaunch\": 50, \"sessionCookie\": \"YOUR_LINKEDIN_COOKIE_HERE\"}"
+            }
+          ]
+        }
+      },
+      "id": "launch_with_cookie",
+      "name": "Launch with Cookie",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [450, 300],
+      "notes": "YOU MUST ADD YOUR LINKEDIN COOKIE"
+    },
+    {
+      "parameters": {
+        "content": "## THE TRUTH:\n\nPhantomBuster's API **REQUIRES** the session cookie in every call.\nThe stored UI config is NEVER used by API.\n\n## To Get Your Cookie:\n1. Open LinkedIn in Chrome\n2. Press F12 → Application → Cookies\n3. Find 'li_at' cookie\n4. Copy the value\n5. Replace YOUR_LINKEDIN_COOKIE_HERE\n\n## This is the ONLY way it works via API",
+        "height": 300,
+        "width": 400,
+        "color": 1
+      },
+      "id": "truth",
+      "name": "The Reality",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch with Cookie",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

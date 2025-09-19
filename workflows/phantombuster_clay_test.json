@@ -1,0 +1,177 @@
+{
+  "name": "PhantomBuster to Clay Test",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "5d6e0818-f3f3-4b8e-a4e2-8c9e1b2d3a4f",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "launch",
+        "agentId": "REPLACE_WITH_YOUR_AGENT_ID",
+        "arguments": "={{JSON.stringify({\"postUrl\": \"https://www.linkedin.com/posts/databricks_example\", \"numberOfCommentsPerLaunch\": 50, \"numberOfLikersPerLaunch\": 50, \"manualLaunch\": true})}}"
+      },
+      "id": "7f9e1c2d-3b4a-5e6f-a8b9-2d3e4f5a6b7c",
+      "name": "Launch LinkedIn Scraper",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      },
+      "notesInFlow": true,
+      "notes": "Make sure agent is NOT on auto-launch schedule"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "8a9b0c1d-2e3f-4a5b-6c7d-8e9f0a1b2c3d",
+      "name": "Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "getOutput",
+        "agentId": "REPLACE_WITH_YOUR_AGENT_ID"
+      },
+      "id": "9b0c1d2e-3f4a-5b6c-7d8e-9f0a1b2c3d4e",
+      "name": "Get Scraper Results",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform PhantomBuster output to Clay format\nconst phantomData = $input.first().json;\n\n// Check if we have results\nif (!phantomData || !phantomData.data) {\n  return [{\n    json: {\n      error: \"No data from PhantomBuster\"\n    }\n  }];\n}\n\n// Process each lead from PhantomBuster\nconst leads = phantomData.data.map(person => {\n  // Extract name parts\n  const nameParts = (person.name || '').split(' ');\n  const firstName = nameParts[0] || '';\n  const lastName = nameParts.slice(1).join(' ') || '';\n  \n  return {\n    firstName: firstName,\n    lastName: lastName,\n    fullName: person.name || '',\n    title: person.title || person.headline || '',\n    companyName: person.company || person.companyName || '',\n    linkedinUrl: person.profileUrl || person.publicIdentifier || '',\n    engagementType: person.commentText ? 'comment' : 'like',\n    commentText: person.commentText || '',\n    timestamp: new Date().toISOString()\n  };\n});\n\nreturn leads.map(lead => ({ json: lead }));"
+      },
+      "id": "transform_data",
+      "name": "Transform for Clay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-8a99cd54-a8ed-48bb-b659-dbae0b6ced0a",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "id": "0c1d2e3f-4a5b-6c7d-8e9f-0a1b2c3d4e5f",
+      "name": "Send to Clay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "## 🚀 PhantomBuster to Clay Test Workflow\n\n### Setup Instructions:\n\n1. **PhantomBuster Setup**:\n   - Replace `REPLACE_WITH_YOUR_AGENT_ID` in both PhantomBuster nodes\n   - Get your Agent ID from PhantomBuster dashboard\n   - Use \"LinkedIn Post Comments and Likers Scraper\" phantom\n\n2. **Add LinkedIn Post URL**:\n   - Edit the \"Launch LinkedIn Scraper\" node\n   - Replace the example URL with a real LinkedIn post\n   - Example: `https://www.linkedin.com/posts/databricks_[POST-ID]`\n\n3. **Clay Webhook**:\n   - Your webhook is already configured\n   - Check Clay table after running\n\n### Test Steps:\n1. Click \"Execute Workflow\" button\n2. Wait ~3 minutes for PhantomBuster\n3. Check Clay table for new rows\n\n### Troubleshooting:\n- If no data: Check PhantomBuster execution logs\n- If Clay doesn't receive: Check HTTP Request response",
+        "height": 464.3895041492151,
+        "width": 381.63636363636374,
+        "color": 5
+      },
+      "id": "note_instructions",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 100]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch LinkedIn Scraper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch LinkedIn Scraper": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Scraper Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Scraper Results": {
+      "main": [
+        [
+          {
+            "node": "Transform for Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for Clay": {
+      "main": [
+        [
+          {
+            "node": "Send to Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateId": "phantombuster-clay-test-v1"
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "triggerCount": 0,
+  "tags": []
+}

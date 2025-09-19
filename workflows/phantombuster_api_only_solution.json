@@ -1,0 +1,172 @@
+{
+  "name": "PhantomBuster API-Only Solution",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "launch",
+        "agentId": "YOUR_AGENT_ID",
+        "arguments": "={{JSON.stringify({\"postUrl\": \"https://www.linkedin.com/posts/databricks_datalakehouse-activity-7250515834736640000\", \"numberOfCommentsPerLaunch\": 50, \"numberOfLikersPerLaunch\": 50})}}"
+      },
+      "id": "launch_phantom",
+      "name": "Launch PhantomBuster",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      },
+      "notes": "Toggle must be ON in PhantomBuster UI but with NO schedule configured"
+    },
+    {
+      "parameters": {
+        "amount": 3,
+        "unit": "minutes"
+      },
+      "id": "wait",
+      "name": "Wait 3 Minutes",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "resource": "agent",
+        "operation": "getOutput",
+        "agentId": "YOUR_AGENT_ID"
+      },
+      "id": "get_output",
+      "name": "Get Results",
+      "type": "n8n-nodes-base.phantombuster",
+      "typeVersion": 1,
+      "position": [850, 300],
+      "credentials": {
+        "phantombusterApi": {
+          "id": "1",
+          "name": "PhantomBuster API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse PhantomBuster output for Clay\nconst data = $input.first().json;\n\nif (!data || !data.data) {\n  return [{\n    json: {\n      error: \"No data from PhantomBuster\"\n    }\n  }];\n}\n\n// Transform each lead\nconst leads = data.data.map(person => {\n  const nameParts = (person.name || '').split(' ');\n  return {\n    firstName: nameParts[0] || '',\n    lastName: nameParts.slice(1).join(' ') || '',\n    fullName: person.name || '',\n    title: person.headline || person.title || '',\n    companyName: person.company || '',\n    linkedinUrl: person.profileUrl || '',\n    engagementType: person.comment ? 'comment' : 'like',\n    commentText: person.comment || '',\n    timestamp: new Date().toISOString()\n  };\n});\n\nreturn leads.map(lead => ({ json: lead }));"
+      },
+      "id": "transform",
+      "name": "Transform for Clay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1050, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-8a99cd54-a8ed-48bb-b659-dbae0b6ced0a",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "bodyParametersJson": "={{ JSON.stringify($json) }}"
+      },
+      "id": "send_to_clay",
+      "name": "Send to Clay",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1250, 300]
+    },
+    {
+      "parameters": {
+        "content": "## ✅ SOLUTION: API-Only Execution\n\n### PhantomBuster Configuration:\n1. **Toggle: ON** (required for API access)\n2. **Schedule: NONE** (delete all schedules)\n3. **Repeated launch: DISABLED**\n\nThis creates \"idle\" state:\n- Phantom is active (toggle ON)\n- But won't run automatically (no schedule)\n- Only responds to API calls from n8n\n\n### Why This Works:\n- Toggle OFF = Error 412 (completely disabled)\n- Toggle ON + Schedule = Auto-runs (your problem)\n- Toggle ON + No Schedule = API-only (solution!)\n\n### Setup Steps:\n1. Go to your phantom in PhantomBuster\n2. Turn toggle ON\n3. Click scheduling settings\n4. DELETE all schedules/recurring options\n5. Save and test from n8n",
+        "height": 400,
+        "width": 350,
+        "color": 3
+      },
+      "id": "solution_note",
+      "name": "API-Only Solution",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, 50]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Launch PhantomBuster",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Launch PhantomBuster": {
+      "main": [
+        [
+          {
+            "node": "Wait 3 Minutes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 3 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Results": {
+      "main": [
+        [
+          {
+            "node": "Transform for Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for Clay": {
+      "main": [
+        [
+          {
+            "node": "Send to Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": []
+}

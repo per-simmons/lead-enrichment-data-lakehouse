@@ -1,0 +1,123 @@
+{
+  "name": "Apify LinkedIn Comments to Clay Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "manual_trigger",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "operation": "runActorGetDataset",
+        "actorId": "harvestapi/linkedin-post-comments",
+        "input": "={{ JSON.stringify({\n  \"posts\": [\n    \"https://www.linkedin.com/posts/databricks_big-milestone-for-databricks-we-just-shared-activity-7370795877097066496-uP3K/\"\n  ],\n  \"maxItems\": 100,\n  \"postedLimit\": \"any\"\n}) }}"
+      },
+      "id": "run_apify_actor",
+      "name": "Run Actor and Get Dataset",
+      "type": "@apify/n8n-nodes-apify.apify",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "credentials": {
+        "apifyApi": {
+          "id": "new",
+          "name": "Apify API"
+        }
+      },
+      "notes": "Runs actor, waits for completion, returns dataset items"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Transform Apify data to Clay format\nconst apifyData = $input.all();\nconst clayRecords = [];\n\nfor (const item of apifyData) {\n  const data = item.json;\n  \n  // Transform each comment to Clay format\n  if (data.actor) {\n    clayRecords.push({\n      // Person Information\n      firstName: data.actor.name ? data.actor.name.split(' ')[0] : '',\n      lastName: data.actor.name ? data.actor.name.split(' ').slice(1).join(' ') : '',\n      fullName: data.actor.name || '',\n      title: data.actor.position || '',\n      linkedinUrl: data.actor.linkedinUrl || '',\n      profilePictureUrl: data.actor.pictureUrl || '',\n      \n      // Engagement Information\n      engagementType: data.commentary ? 'comment' : 'reaction',\n      commentText: data.commentary || '',\n      reactionType: data.reactionTypeCounts && data.reactionTypeCounts[0] ? data.reactionTypeCounts[0].type : '',\n      \n      // Post Information\n      postId: data.postId || '',\n      postUrl: data.linkedinUrl || '',\n      \n      // Metadata\n      numReplies: data.numComments || 0,\n      numLikes: data.reactionTypeCounts ? data.reactionTypeCounts.reduce((sum, r) => sum + r.count, 0) : 0,\n      scrapedAt: new Date().toISOString(),\n      commentCreatedAt: data.createdAt || '',\n      \n      // Source\n      source: 'LinkedIn Post Comments',\n      sourceActor: 'harvestapi/linkedin-post-comments'\n    });\n  }\n}\n\nreturn clayRecords.map(record => ({ json: record }));"
+      },
+      "id": "transform_for_clay",
+      "name": "Transform for Clay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [650, 300],
+      "notes": "Convert Apify format to Clay enrichment format"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.clay.com/v3/sources/webhook/pull-in-data-from-a-webhook-8a99cd54-a8ed-48bb-b659-dbae0b6ced0a",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}"
+      },
+      "id": "send_to_clay",
+      "name": "Send to Clay Webhook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [850, 300],
+      "notes": "Send transformed data to Clay"
+    },
+    {
+      "parameters": {
+        "content": "## 🚀 Apify LinkedIn to Clay Pipeline\n\n### Prerequisites:\n1. **Install Apify Community Node**:\n   - Go to Settings → Community Nodes\n   - Install: `@apify/n8n-nodes-apify`\n\n2. **Configure Apify Credentials**:\n   - Click on \"Run LinkedIn Comments Actor (Sync)\" node\n   - Add credentials:\n   - API Key: `YOUR_APIFY_API_KEY`\n\n3. **Update LinkedIn Posts**:\n   - Edit the \"Run LinkedIn Comments Actor (Sync)\" node\n   - Modify the \"posts\" array with your target URLs\n\n### How it Works (Simplified!):\n1. **Run Actor Synchronously**: Runs and waits for completion\n2. **Transform**: Converts to Clay format\n3. **Send to Clay**: Webhook delivery\n\n### Actor: harvestapi/linkedin-post-comments\n- **Cost**: $2 per 1,000 comments (cheapest!)\n- **Success Rate**: 99.8%\n- **No cookies required!**\n\n### Clay Fields Mapped:\n- firstName, lastName, fullName\n- title, linkedinUrl, profilePictureUrl\n- engagementType (comment/reaction)\n- commentText, reactionType\n- postId, postUrl\n- numReplies, numLikes\n- timestamps",
+        "height": 600,
+        "width": 400,
+        "color": 5
+      },
+      "id": "instructions",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [250, -350]
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Run Actor and Get Dataset",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Actor and Get Dataset": {
+      "main": [
+        [
+          {
+            "node": "Transform for Clay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transform for Clay": {
+      "main": [
+        [
+          {
+            "node": "Send to Clay Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": [],
+  "triggerCount": 0
+}
