@@ -1,7 +1,7 @@
 # Lead Enrichment Data Lakehouse
 
 ## Overview
-This is a client project that automates lead enrichment by extracting LinkedIn engagement data and processing it through Clay's data enrichment platform.
+This is an N8N automation (adapted from a client project working with a Data Lakehouse company) that automates lead enrichment by extracting LinkedIn engagement data and processing it through Clay's data enrichment platform.
 
 ## What It Does
 - Extracts LinkedIn post engagement data (comments, reactions, profile info)
